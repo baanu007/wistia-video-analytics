@@ -4,8 +4,8 @@
 --  and for manual debugging runs via the Redshift Query Editor.)
 --
 -- Replace:
---   {S3_SILVER_URI}   e.g. s3://wistia-analytics-processed-041282018868/dim_media/year=2026/month=04/day=20/
---   {IAM_ROLE_ARN}    e.g. arn:aws:iam::041282018868:role/wistia-redshift-s3-role
+--   {S3_SILVER_URI}   e.g. s3://wistia-analytics-processed-<ACCOUNT_ID>/dim_media/year=2026/month=04/day=20/
+--   {IAM_ROLE_ARN}    e.g. arn:aws:iam::<ACCOUNT_ID>:role/wistia-redshift-s3-role
 -- =========================================================================
 
 -- ---- dim_media ----

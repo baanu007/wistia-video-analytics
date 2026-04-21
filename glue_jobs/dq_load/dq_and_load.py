@@ -253,15 +253,11 @@ STAGING_COPY_COMMANDS = {
         IAM_ROLE '{iam_role}'
         FORMAT AS PARQUET;
     """,
-    # Fact has a different Parquet column order than the table DDL (Spark
-    # reordered during joins). Explicit column list maps Parquet columns by
-    # their position to the correct named staging columns.
+    # Fact Parquet column order now matches the DDL (the transform job
+    # does a final .select() in DDL order), so no explicit column list
+    # is needed -- COPY positional mapping works directly.
     "fact_media_engagement": """
         COPY wistia.public.stg_fact_media_engagement
-            (visitor_key, event_key, media_id, event_date, received_at,
-             ip, country, region, city, lat, lon, percent_viewed,
-             embed_url, media_name, browser, platform, is_mobile,
-             visitor_play_count, visitor_load_count, load_date)
         FROM '{s3_path}'
         IAM_ROLE '{iam_role}'
         FORMAT AS PARQUET;

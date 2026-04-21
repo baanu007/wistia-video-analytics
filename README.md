@@ -97,7 +97,7 @@ The scripts pick up these env vars (all optional except `WISTIA_API_TOKEN`):
 | Variable | Default | Purpose |
 |---|---|---|
 | `WISTIA_API_TOKEN` | *required* | Wistia API Bearer token, stored in Secrets Manager at setup time |
-| `ALERT_EMAIL` | `mrmanndy007.mm@gmail.com` | SNS alert target |
+| `ALERT_EMAIL` | *required* | SNS alert target (e.g. `you@example.com`) |
 | `AWS_PROFILE` | `globalpartners` | Local AWS CLI profile |
 | `AWS_REGION` | `us-east-1` | Deployment region |
 | `SCHEDULE_CRON` | `cron(0 6 * * ? *)` | Daily pipeline run time |
@@ -115,6 +115,7 @@ pytest tests/ -v
 
 # One-shot infrastructure provisioning
 export WISTIA_API_TOKEN="your-bearer-token-here"
+export ALERT_EMAIL="you@example.com"
 bash scripts/setup.sh
 
 # Create Redshift tables (star schema + staging + views)

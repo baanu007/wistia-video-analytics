@@ -1,0 +1,14 @@
+# Runtime dependencies used by the Glue jobs themselves are declared in
+# Terraform's default_arguments --additional-python-modules and installed
+# by Glue at job start. This file is for LOCAL development + CI only:
+# linting, running pytest, and validating before deploy.
+
+# Test + lint
+pytest>=8.0
+ruff>=0.6
+
+# Used by unit tests + local exploration scripts
+boto3>=1.35
+requests>=2.32
+pandas>=2.2
+pyarrow>=16.0

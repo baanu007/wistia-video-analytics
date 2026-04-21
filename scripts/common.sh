@@ -29,6 +29,12 @@ elif [[ -z "$AWS_PROFILE" ]]; then
 fi
 export AWS_PAGER=""  # never invoke a pager in scripts
 
+# Path helpers (defined early so later blocks can reference $SCRIPT_DIR)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export SCRIPT_DIR
+export REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+export IAM_DIR="$SCRIPT_DIR/iam"
+
 # ------------------------------------------------------------
 # Identity (looked up lazily the first time)
 # ------------------------------------------------------------
@@ -78,12 +84,6 @@ if [[ -z "${ALERT_EMAIL:-}" ]]; then
   fi
 fi
 export ALERT_EMAIL="${ALERT_EMAIL:-}"
-
-# Path helpers
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export SCRIPT_DIR
-export REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-export IAM_DIR="$SCRIPT_DIR/iam"
 
 # Convert an MSYS/Git-Bash path to a Windows-native path when running
 # on Windows, so the Windows AWS CLI can read it. On Linux/macOS this

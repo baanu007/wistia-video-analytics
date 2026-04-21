@@ -8,11 +8,9 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  TERRAFORM_VERSION: "1.14.9"
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   lint-and-test:
@@ -32,64 +30,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Lint with ruff
-        run: ruff check glue_jobs/ tests/ || echo "Lint issues found (non-blocking for now)"
+      - name: Lint with ruff (non-blocking)
+        run: ruff check glue_jobs/ tests/ || echo "Lint issues found (non-blocking)"
 
       - name: Run unit tests
         run: pytest tests/ -v
 
-  terraform-validate:
-    name: Terraform Validate & Plan
+      - name: Shell-script syntax check
+        run: bash -n scripts/*.sh
+
+  deploy-code:
+    name: Deploy Glue scripts to AWS
     runs-on: ubuntu-latest
     needs: lint-and-test
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Terraform Init
-        working-directory: terraform
-        run: terraform init -backend=false
-
-      - name: Terraform Validate
-        working-directory: terraform
-        run: terraform validate
-
-      - name: Terraform Format Check
-        working-directory: terraform
-        run: terraform fmt -check -recursive || echo "Format issues (non-blocking)"
-
-      - name: Terraform Plan (dry-run, no secrets)
-        if: github.event_name == 'pull_request'
-        working-directory: terraform
-        env:
-          TF_VAR_wistia_api_token: ${{ secrets.WISTIA_API_TOKEN }}
-          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
-          TF_VAR_aws_profile: ""
-        run: terraform plan -no-color
-
-  deploy:
-    name: Deploy to AWS
-    runs-on: ubuntu-latest
-    needs: terraform-validate
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: production
     steps:
       - uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -97,14 +55,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Terraform Init
-        working-directory: terraform
-        run: terraform init
-
-      - name: Terraform Apply
-        working-directory: terraform
+      - name: Upload Glue scripts + refresh jobs
+        # We don't run setup.sh in CI (infrastructure changes are rare and
+        # done manually by an admin). CI only deploys new code by syncing
+        # the Glue Python scripts to S3.
         env:
-          TF_VAR_wistia_api_token: ${{ secrets.WISTIA_API_TOKEN }}
-          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
-          TF_VAR_aws_profile: ""
-        run: terraform apply -auto-approve
+          # common.sh falls back to aws env vars if AWS_PROFILE is unset
+          AWS_PROFILE: ""
+        run: bash scripts/deploy-code.sh

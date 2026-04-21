@@ -1,0 +1,6 @@
+# Keep shell scripts as LF so they run correctly on Linux CI runners.
+*.sh text eol=lf
+scripts/*.sh text eol=lf
+
+# Keep JSON files consistent
+*.json text eol=lf

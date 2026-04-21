@@ -1,14 +1,3 @@
-# Terraform
-.terraform/
-.terraform.lock.hcl
-*.tfstate
-*.tfstate.*
-*.tfstate.backup
-*.tfplan
-tfplan
-terraform.tfvars
-!terraform.tfvars.example
-
 # Python
 __pycache__/
 *.py[cod]
@@ -35,6 +24,9 @@ env/
 !.env.example
 aws_credentials
 credentials.json
+
+# Script temp artifacts
+scripts/.tmp_*
 
 # Build artifacts
 dist/

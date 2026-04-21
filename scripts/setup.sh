@@ -22,6 +22,7 @@
 source "$(dirname "$0")/common.sh"
 
 [[ -z "${WISTIA_API_TOKEN:-}" ]] && die "WISTIA_API_TOKEN env var is required."
+[[ -z "${ALERT_EMAIL:-}" ]] && die "ALERT_EMAIL env var is required (where should SNS send alerts?)."
 
 log "Account: $ACCOUNT_ID  Region: $AWS_REGION  Profile: $AWS_PROFILE"
 

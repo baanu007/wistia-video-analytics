@@ -67,8 +67,17 @@ export SCHEDULE_CRON="${SCHEDULE_CRON:-cron(0 6 * * ? *)}"
 # Two media IDs to track (from the requirement doc)
 export MEDIA_IDS="${MEDIA_IDS:-gskhw4w4lm,v08dlrgr7v}"
 
-# Defaults from saved project memory / project docs
-export ALERT_EMAIL="${ALERT_EMAIL:-mrmanndy007.mm@gmail.com}"
+# Required: set ALERT_EMAIL before running setup.sh so SNS knows where
+# to send failure alerts. Intentionally no default -- we do not publish
+# anyone's personal email in a public repo.
+if [[ -z "${ALERT_EMAIL:-}" ]]; then
+  # If a .env.local file exists (gitignored), source it for local dev
+  if [[ -f "$SCRIPT_DIR/../.env.local" ]]; then
+    # shellcheck disable=SC1091
+    source "$SCRIPT_DIR/../.env.local"
+  fi
+fi
+export ALERT_EMAIL="${ALERT_EMAIL:-}"
 
 # Path helpers
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -21,6 +21,7 @@ env/
 *.key
 .env
 .env.*
+.env.local
 !.env.example
 aws_credentials
 credentials.json

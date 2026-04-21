@@ -11,6 +11,17 @@ terraform {
       version = "~> 3.6"
     }
   }
+
+  # Remote backend: local runs and GitHub Actions CI share the same state.
+  # The bucket + DynamoDB lock table are created out-of-band (not by this
+  # Terraform) to avoid the chicken-and-egg problem.
+  backend "s3" {
+    bucket         = "wistia-analytics-tfstate-041282018868"
+    key            = "wistia-pipeline/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "wistia-analytics-tflock"
+    encrypt        = true
+  }
 }
 
 provider "aws" {

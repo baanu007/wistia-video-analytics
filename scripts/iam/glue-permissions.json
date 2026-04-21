@@ -1,0 +1,67 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "S3DataBuckets",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": [
+        "arn:aws:s3:::__BUCKET_RAW__",
+        "arn:aws:s3:::__BUCKET_RAW__/*",
+        "arn:aws:s3:::__BUCKET_PROC__",
+        "arn:aws:s3:::__BUCKET_PROC__/*",
+        "arn:aws:s3:::__BUCKET_SCRIPTS__",
+        "arn:aws:s3:::__BUCKET_SCRIPTS__/*"
+      ]
+    },
+    {
+      "Sid": "SecretsManager",
+      "Effect": "Allow",
+      "Action": ["secretsmanager:GetSecretValue"],
+      "Resource": [
+        "arn:aws:secretsmanager:__REGION__:__ACCOUNT__:secret:wistia/api-token*",
+        "arn:aws:secretsmanager:__REGION__:__ACCOUNT__:secret:wistia/redshift-admin*"
+      ]
+    },
+    {
+      "Sid": "SSMWatermarks",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:GetParameters",
+        "ssm:PutParameter"
+      ],
+      "Resource": "arn:aws:ssm:__REGION__:__ACCOUNT__:parameter/wistia/watermark/*"
+    },
+    {
+      "Sid": "RedshiftDataAPI",
+      "Effect": "Allow",
+      "Action": [
+        "redshift-data:ExecuteStatement",
+        "redshift-data:BatchExecuteStatement",
+        "redshift-data:DescribeStatement",
+        "redshift-data:GetStatementResult",
+        "redshift-data:ListStatements",
+        "redshift-data:CancelStatement",
+        "redshift-serverless:GetCredentials"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

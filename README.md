@@ -3,6 +3,7 @@
 End-to-end data pipeline on AWS that pulls video analytics from the Wistia
 Stats API, lands them in S3, transforms to a star schema with PySpark on Glue,
 and loads into Redshift Serverless. Orchestrated by AWS Glue Workflows.
+All infrastructure provisioned via AWS CLI shell scripts.
 
 ## Architecture
 
@@ -50,22 +51,20 @@ API has no channel field.
 wistia-pipeline/
 ├── README.md
 ├── .gitignore
+├── requirements.txt
 ├── .github/workflows/ci-cd.yml     GitHub Actions CI/CD
 │
-├── terraform/                      All AWS infrastructure
-│   ├── main.tf
-│   ├── variables.tf
-│   ├── outputs.tf
-│   ├── s3.tf                       3 buckets: raw, processed, scripts
-│   ├── iam.tf                      Glue job role + Redshift S3 role
-│   ├── secrets.tf                  Wistia token + Redshift password
-│   ├── ssm.tf                      Watermark parameters
-│   ├── glue.tf                     3 jobs + workflow + triggers + uploads
-│   ├── redshift.tf                 Serverless namespace + workgroup
-│   ├── cloudwatch.tf               Logs + failure alarm
-│   ├── sns.tf                      Alert topic + email subscription
-│   ├── terraform.tfvars.example
-│   └── terraform.tfvars            (gitignored)
+├── scripts/                        AWS infrastructure as shell scripts
+│   ├── common.sh                   Shared env vars + idempotent helpers
+│   ├── setup.sh                    Provision all AWS resources (one-shot)
+│   ├── deploy-code.sh              Upload updated Glue scripts (fast path)
+│   ├── create-tables.sh            Run sql/create_tables.sql on Redshift
+│   ├── destroy.sh                  Tear down everything
+│   └── iam/                        IAM policy JSON documents
+│       ├── glue-trust.json
+│       ├── glue-permissions.json
+│       ├── redshift-trust.json
+│       └── redshift-s3-read.json
 │
 ├── glue_jobs/
 │   ├── ingest/wistia_ingest.py         4 endpoints, pagination, retries
@@ -87,80 +86,85 @@ wistia-pipeline/
 
 * AWS account with admin-equivalent permissions
 * AWS CLI v1 or v2 installed and configured with a profile
-* Terraform >= 1.5.0
 * Python 3.11
+* `openssl` and `bash` (both ship with Git Bash / WSL / macOS / Linux)
 * (Optional) GitHub account + `gh` CLI to push the repo
 
-## Local Setup
+## Environment Variables
+
+The scripts pick up these env vars (all optional except `WISTIA_API_TOKEN`):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `WISTIA_API_TOKEN` | *required* | Wistia API Bearer token, stored in Secrets Manager at setup time |
+| `ALERT_EMAIL` | `mrmanndy007.mm@gmail.com` | SNS alert target |
+| `AWS_PROFILE` | `globalpartners` | Local AWS CLI profile |
+| `AWS_REGION` | `us-east-1` | Deployment region |
+| `SCHEDULE_CRON` | `cron(0 6 * * ? *)` | Daily pipeline run time |
+| `REDSHIFT_BASE_CAPACITY` | `8` | Redshift Serverless base RPU |
+
+## First-Time Setup
 
 ```bash
-# Clone or cd into this folder
+# From the repo root
 cd wistia-pipeline
 
-# Create terraform.tfvars from the example and fill in your values
-cp terraform/terraform.tfvars.example terraform/terraform.tfvars
-# edit terraform/terraform.tfvars - set wistia_api_token, alert_email, aws_profile
-
-# Install test deps and run tests
-pip install pytest boto3 requests pandas
+# Install test deps (for local development)
+pip install -r requirements.txt
 pytest tests/ -v
+
+# One-shot infrastructure provisioning
+export WISTIA_API_TOKEN="your-bearer-token-here"
+bash scripts/setup.sh
+
+# Create Redshift tables (star schema + staging + views)
+bash scripts/create-tables.sh
 ```
 
-## Deploy
-
-```bash
-cd terraform
-
-terraform init
-terraform plan -out=tfplan
-terraform apply tfplan
-```
-
-After apply:
-
-1. **Confirm the SNS email subscription** -- AWS sends a confirmation email.
-2. **Create Redshift tables** using the Redshift Query Editor v2 in the AWS
-   Console, or via the redshift-data API:
-
+After `setup.sh` completes:
+1. Confirm the SNS subscription email sent to `ALERT_EMAIL`
+2. Trigger a manual workflow run:
    ```bash
-   aws redshift-data execute-statement \
-       --workgroup-name wistia-analytics-wg \
-       --database wistia \
-       --sql "$(cat ../sql/create_tables.sql)" \
-       --profile globalpartners
+   aws glue start-workflow-run --name wistia-daily-workflow --profile globalpartners
    ```
 
-## Run the Pipeline Manually
+## Everyday Deploys
+
+After changing any Glue script, re-upload with:
 
 ```bash
-aws glue start-workflow-run \
-    --name wistia-daily-workflow \
-    --profile globalpartners \
-    --region us-east-1
+bash scripts/deploy-code.sh
 ```
 
-Monitor:
+This is the same command CI runs on every push to `main` -- you rarely need
+to run it manually unless testing a change before committing.
+
+## Monitor Pipeline Runs
 
 ```bash
-aws glue get-workflow-run \
-    --name wistia-daily-workflow \
-    --run-id <run-id-from-above> \
-    --include-graph \
-    --profile globalpartners
+# List recent runs
+aws glue get-workflow-runs --name wistia-daily-workflow --profile globalpartners \
+  --query 'Runs[*].[StartedOn,Status]' --output table
+
+# Manual trigger
+aws glue start-workflow-run --name wistia-daily-workflow --profile globalpartners
+
+# Tail logs
+aws logs tail /aws-glue/python-jobs/output --follow --profile globalpartners
 ```
 
-Or watch in the console: **AWS Glue > Workflows > wistia-daily-workflow**.
+Or watch via the AWS Console: **AWS Glue > Workflows > wistia-daily-workflow**.
 
 ## Verify Data Landed
 
 ```bash
-# Bronze should have 4 folders under today's date partition
+# Bronze (raw JSON)
 aws s3 ls s3://wistia-analytics-raw-<acct-id>/ --recursive --profile globalpartners | head
 
-# Silver should have Parquet files for each table
+# Silver (Parquet)
 aws s3 ls s3://wistia-analytics-processed-<acct-id>/ --recursive --profile globalpartners | head
 
-# Redshift table counts
+# Redshift row counts
 aws redshift-data execute-statement \
     --workgroup-name wistia-analytics-wg \
     --database wistia \
@@ -168,22 +172,17 @@ aws redshift-data execute-statement \
     --profile globalpartners
 ```
 
-## Daily Schedule
-
-The scheduled trigger `wistia-daily-schedule` fires at `cron(0 6 * * ? *)` --
-6 AM UTC daily. Change in `terraform/variables.tf` (`schedule_cron`).
-
-## Cleanup (after the 7-day run)
+## Teardown
 
 ```bash
-cd terraform
-terraform destroy
+bash scripts/destroy.sh
+# Type DESTROY to confirm
 ```
 
-This removes all infrastructure. S3 buckets have `force_destroy = true` so
-they'll be emptied automatically.
+This deletes every AWS resource created by `setup.sh`, including
+S3 buckets and their data. Cannot be undone.
 
-## Expected Monthly Cost
+## Cost
 
 Roughly **$5.50 – $12 / month**, dominated by Redshift Serverless
 (8 RPU base, charged when queries run) and Glue PySpark DPU-hours.
@@ -191,19 +190,22 @@ Roughly **$5.50 – $12 / month**, dominated by Redshift Serverless
 ## Security Notes
 
 * Wistia API token stored in AWS Secrets Manager, never in code
-* Redshift admin password auto-generated by Terraform, stored in Secrets Manager
+* Redshift admin password auto-generated by `setup.sh` (`openssl rand`), stored in Secrets Manager
 * S3 buckets: SSE-AES256 encryption, all public access blocked
-* IAM roles follow least-privilege (Glue role can't touch Redshift admin,
-  Redshift role can only read from Silver)
+* IAM roles follow least-privilege (Glue role scoped to specific buckets, secrets, parameters; Redshift role read-only on Silver)
 
 ## CI/CD
 
-GitHub Actions runs on every PR and push to main:
+GitHub Actions runs on every PR and push to `main`:
 
 * **Lint + Unit tests** run on every PR
-* **Terraform validate + plan** on every PR
-* **Terraform apply** on push to `main` (guarded by the `production` environment
-  in GitHub which can require manual approval)
+* **Shell script syntax check** on every PR
+* **Deploy Glue scripts** on push to `main` (via `bash scripts/deploy-code.sh`, gated by the `production` environment)
 
-Required GitHub secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
-`WISTIA_API_TOKEN`, `ALERT_EMAIL`.
+Required GitHub secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`.
+(`WISTIA_API_TOKEN` and `ALERT_EMAIL` are only needed at initial `setup.sh` time,
+not on every code deploy.)
+
+Infrastructure changes are **manual**: an admin runs `bash scripts/setup.sh`
+from a workstation with the correct AWS profile. This matches the real-world
+cadence where code changes happen often but infra rarely.

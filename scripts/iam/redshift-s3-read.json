@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadSilverForCOPY",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": [
+        "arn:aws:s3:::__BUCKET_PROC__",
+        "arn:aws:s3:::__BUCKET_PROC__/*"
+      ]
+    }
+  ]
+}

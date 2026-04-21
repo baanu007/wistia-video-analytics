@@ -17,10 +17,16 @@ export MSYS_NO_PATHCONV=1
 # Region / profile
 # ------------------------------------------------------------
 export AWS_REGION="${AWS_REGION:-us-east-1}"
-# Fall back to `globalpartners` only if AWS_PROFILE is UNSET -- NOT if it's
-# explicitly empty. CI passes AWS_PROFILE="" so the AWS CLI relies on
-# AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY env vars instead.
-export AWS_PROFILE="${AWS_PROFILE-globalpartners}"
+# Profile handling:
+#   - If AWS_PROFILE is UNSET, default to 'globalpartners' (local dev)
+#   - If AWS_PROFILE is SET BUT EMPTY (GitHub Actions sets it empty so the
+#     CI step uses AWS_ACCESS_KEY_ID env vars), unset it so AWS CLI
+#     doesn't try to look up a profile named "".
+if [[ -z "${AWS_PROFILE+x}" ]]; then
+  export AWS_PROFILE=globalpartners
+elif [[ -z "$AWS_PROFILE" ]]; then
+  unset AWS_PROFILE
+fi
 export AWS_PAGER=""  # never invoke a pager in scripts
 
 # ------------------------------------------------------------

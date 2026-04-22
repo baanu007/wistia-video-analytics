@@ -100,7 +100,7 @@ The scripts pick up these env vars (all optional except `WISTIA_API_TOKEN`):
 | `ALERT_EMAIL` | *required* | SNS alert target (e.g. `you@example.com`) |
 | `AWS_PROFILE` | `globalpartners` | Local AWS CLI profile |
 | `AWS_REGION` | `us-east-1` | Deployment region |
-| `SCHEDULE_CRON` | `cron(0 6 * * ? *)` | Daily pipeline run time |
+| `SCHEDULE_CRON` | `cron(0 3 * * ? *)` | Daily pipeline run time (03:00 UTC = 10:00 PM CDT / 9:00 PM CST) |
 | `REDSHIFT_BASE_CAPACITY` | `8` | Redshift Serverless base RPU |
 
 ## First-Time Setup

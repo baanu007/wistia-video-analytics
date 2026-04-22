@@ -68,7 +68,7 @@ export GLUE_JOB_INGEST="wistia-ingest"
 export GLUE_JOB_TRANSFORM="wistia-transform"
 export GLUE_JOB_DQLOAD="wistia-dq-and-load"
 export GLUE_WORKFLOW="wistia-daily-workflow"
-export SCHEDULE_CRON="${SCHEDULE_CRON:-cron(0 6 * * ? *)}"
+export SCHEDULE_CRON="${SCHEDULE_CRON:-cron(0 3 * * ? *)}"  # 03:00 UTC = 10:00 PM CDT
 
 # Two media IDs to track (from the requirement doc)
 export MEDIA_IDS="${MEDIA_IDS:-gskhw4w4lm,v08dlrgr7v}"

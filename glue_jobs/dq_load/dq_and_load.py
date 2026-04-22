@@ -144,6 +144,12 @@ def run_dq_checks() -> Dict[str, Dict[str, Any]]:
 
         try:
             df = _read_parquet_from_s3(uri)
+        except FileNotFoundError:
+            # Incremental pipelines legitimately produce empty partitions on
+            # quiet days (e.g. Events API returns nothing new). Skip the
+            # table -- main() will skip loading it too. This is NOT a failure.
+            log_event("dq_skip_no_data", table=table, uri=uri)
+            continue
         except Exception as exc:  # noqa: BLE001
             raise RuntimeError(f"DQ: failed to read Silver parquet for {table}: {exc}") from exc
 
@@ -331,8 +337,17 @@ def main() -> None:
     dq_results = run_dq_checks()
     log_event("dq_phase_complete", results=dq_results)
 
-    # Load in dependency order: dims first, then fact
+    if not dq_results:
+        log_event("load_skip_all", reason="no Silver data for today -- nothing to load")
+        log_event("job_complete")
+        return
+
+    # Load in dependency order: dims first, then fact. Skip any table that
+    # had no Silver partition for today (incremental pipeline, quiet day).
     for table in ("dim_media", "dim_visitor", "fact_media_engagement"):
+        if table not in dq_results:
+            log_event("load_skip", table=table, reason="no Silver data for today")
+            continue
         log_event("load_start", table=table)
         load_table(table)
         log_event("load_complete", table=table)

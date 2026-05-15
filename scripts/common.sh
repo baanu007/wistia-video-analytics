@@ -37,18 +37,29 @@ export IAM_DIR="$SCRIPT_DIR/iam"
 
 # ------------------------------------------------------------
 # Identity (looked up lazily the first time)
+#
+# ACCOUNT_ID is only required to derive bucket names below. If all three
+# bucket names are already provided via env (BUCKET_RAW / BUCKET_PROC /
+# BUCKET_SCRIPTS), we skip the STS call entirely. This keeps the AWS
+# account ID out of CI logs when buckets are injected as secrets.
 # ------------------------------------------------------------
-if [[ -z "${ACCOUNT_ID:-}" ]]; then
-  ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+if [[ -z "${BUCKET_RAW:-}" || -z "${BUCKET_PROC:-}" || -z "${BUCKET_SCRIPTS:-}" ]]; then
+  if [[ -z "${ACCOUNT_ID:-}" ]]; then
+    ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+  fi
+  export ACCOUNT_ID
 fi
-export ACCOUNT_ID
 
 # ------------------------------------------------------------
 # Resource names (deterministic -- re-runnable)
+#
+# Each bucket name can be overridden by setting the matching env var
+# (BUCKET_RAW / BUCKET_PROC / BUCKET_SCRIPTS) before sourcing this file.
+# Otherwise we derive a deterministic name from the AWS account ID.
 # ------------------------------------------------------------
-export BUCKET_RAW="wistia-analytics-raw-${ACCOUNT_ID}"
-export BUCKET_PROC="wistia-analytics-processed-${ACCOUNT_ID}"
-export BUCKET_SCRIPTS="wistia-analytics-scripts-${ACCOUNT_ID}"
+export BUCKET_RAW="${BUCKET_RAW:-wistia-analytics-raw-${ACCOUNT_ID}}"
+export BUCKET_PROC="${BUCKET_PROC:-wistia-analytics-processed-${ACCOUNT_ID}}"
+export BUCKET_SCRIPTS="${BUCKET_SCRIPTS:-${SCRIPTS_BUCKET:-wistia-analytics-scripts-${ACCOUNT_ID}}}"
 
 export GLUE_ROLE_NAME="wistia-glue-job-role"
 export REDSHIFT_ROLE_NAME="wistia-redshift-s3-role"

@@ -12,10 +12,23 @@
 # use setup.sh instead.
 # ============================================================
 
+# If SCRIPTS_BUCKET is provided via env (e.g. from a GitHub Secret in CI),
+# use it directly so common.sh does not have to call STS, which keeps the
+# AWS account ID out of CI logs.
+if [[ -n "${SCRIPTS_BUCKET:-}" ]]; then
+  export BUCKET_SCRIPTS="${SCRIPTS_BUCKET}"
+fi
+
 # shellcheck source=common.sh
 source "$(dirname "$0")/common.sh"
 
-log "Uploading Glue scripts to s3://$BUCKET_SCRIPTS/glue_jobs/"
+# Sanity check: bucket must be set somehow before we proceed.
+: "${BUCKET_SCRIPTS:?BUCKET_SCRIPTS (or SCRIPTS_BUCKET) must be set before deploy}"
+
+# Do not log the full bucket name (it contains the account ID) -- log a
+# redacted form instead. Local devs still see the real bucket in their
+# own shell because common.sh exports it.
+log "Uploading Glue scripts to s3://<scripts-bucket>/glue_jobs/"
 
 aws s3 cp "$(winpath "$REPO_ROOT/glue_jobs/ingest/wistia_ingest.py")" \
           "s3://$BUCKET_SCRIPTS/glue_jobs/ingest/wistia_ingest.py" >/dev/null
